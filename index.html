@@ -674,28 +674,49 @@
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', function() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date-litige').value = today;
-            
-            loadLitigesFromStorage();
-            updateTotals();
-            renderLitiges();
-            
-            document.getElementById('litige-form').addEventListener('submit', function(e) {
-                e.preventDefault();
-                addLitige();
-            });
-            
-            document.getElementById('reset-form').addEventListener('click', function() {
-                document.getElementById('litige-form').reset();
+            (async function init() {
+                const today = new Date().toISOString().split('T')[0];
                 document.getElementById('date-litige').value = today;
-            });
-            
-            document.getElementById('apply-filters').addEventListener('click', renderLitiges);
-            ['filter-statut', 'filter-type', 'filter-date-from', 'filter-date-to', 'filter-search'].forEach(function(id) {
-                document.getElementById(id).addEventListener('change', renderLitiges);
-                document.getElementById(id).addEventListener('input', renderLitiges);
-            });
+
+                // Try to load remote data first (Supabase) with fallback to localStorage
+                try {
+                    const remote = await loadData();
+                    if (remote) {
+                        // remote may be an object containing `litiges` or directly an array
+                        if (Array.isArray(remote)) {
+                            litiges = remote;
+                        } else if (remote.litiges && Array.isArray(remote.litiges)) {
+                            litiges = remote.litiges;
+                        } else {
+                            // if stored as object with other shape, ignore
+                        }
+                    } else {
+                        // fallback to localStorage
+                        loadLitigesFromStorage();
+                    }
+                } catch (e) {
+                    loadLitigesFromStorage();
+                }
+
+                updateTotals();
+                renderLitiges();
+
+                document.getElementById('litige-form').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    addLitige();
+                });
+
+                document.getElementById('reset-form').addEventListener('click', function() {
+                    document.getElementById('litige-form').reset();
+                    document.getElementById('date-litige').value = today;
+                });
+
+                document.getElementById('apply-filters').addEventListener('click', renderLitiges);
+                ['filter-statut', 'filter-type', 'filter-date-from', 'filter-date-to', 'filter-search'].forEach(function(id) {
+                    document.getElementById(id).addEventListener('change', renderLitiges);
+                    document.getElementById(id).addEventListener('input', renderLitiges);
+                });
+            })();
         });
         
         function getFilteredLitiges() {
@@ -840,7 +861,14 @@
         }
 
         function saveLitigesToStorage() {
-            localStorage.setItem('litiges-data', JSON.stringify(litiges));
+            // Always keep a local copy
+            try { localStorage.setItem('litiges-data', JSON.stringify(litiges)); } catch (e) {}
+
+            // If Supabase configured, push remote
+            if (supabaseReady) {
+                // Save the data under a stable wrapper: { litiges: [...] }
+                saveData({ data: { litiges: litiges } });
+            }
         }
 
         function loadLitigesFromStorage() {
@@ -854,7 +882,6 @@
         setInterval(async () => {
             const now = Date.now();
             if (now - lastSyncTime >= SYNC_INTERVAL && supabaseReady) {
-                lastSyncTime = now;
                 try {
                     const response = await fetch(`${SUPABASE_URL}/rest/v1/litige?id=eq.1`, {
                         method: 'GET',
@@ -868,13 +895,21 @@
                         const data = await response.json();
                         if (data && data.length > 0) {
                             const remoteData = data[0];
-                            const remoteTime = new Date(remoteData.updated_at).getTime();
-                            // Comparer les timestamps pour mettre à jour si nécessaire
-                            if (remoteData.data) {
+                            const remoteTime = remoteData.updated_at ? new Date(remoteData.updated_at).getTime() : 0;
+                            // Appliquer si distant plus récent
+                            if (remoteTime > lastSyncTime && remoteData.data) {
                                 isSyncing = true;
-                                // Appeler votre fonction de mise à jour UI ici
-                                console.log('🔄 Données synchronisées depuis Supabase');
+                                // remoteData.data peut être { litiges: [...] } ou un tableau
+                                if (Array.isArray(remoteData.data)) {
+                                    litiges = remoteData.data.slice();
+                                } else if (remoteData.data.litiges && Array.isArray(remoteData.data.litiges)) {
+                                    litiges = remoteData.data.litiges.slice();
+                                }
+                                updateTotals();
+                                renderLitiges();
+                                lastSyncTime = remoteTime || Date.now();
                                 isSyncing = false;
+                                console.log('🔄 Données synchronisées depuis Supabase');
                             }
                         }
                     }
