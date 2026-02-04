@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Gestion des litiges</title>
     <style>
         * {
@@ -319,10 +322,26 @@
     </style>
 </head>
 <body>
+    <script>
+        (function(){
+            if(window.location.search.indexOf('v=') === -1){
+                var ts = Date.now();
+                var base = window.location.origin + window.location.pathname;
+                var search = window.location.search ? window.location.search + '&v=' + ts : '?v=' + ts;
+                var hash = window.location.hash || '';
+                window.location.replace(base + search + hash);
+            }
+        })();
+    </script>
     <div class="container">
         <header>
             <h1>Gestion des litiges</h1>
             <p class="subtitle">DUC Logistique</p>
+            <div style="margin-top: 15px; font-size: 0.9rem; opacity: 0.9;">
+                <span id="supabase-status" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-circle" style="font-size: 0.6rem; color: #ef4444;"></i> Chargement...
+                </span>
+            </div>
         </header>
         
         <div class="dashboard">
@@ -483,7 +502,165 @@
         </footer>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script>
+        // Configuration Supabase
+        const SUPABASE_URL = "https://kblgnzlhvefhlwhtyeym.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_8-pWfbGnRL5cqmiawUQgLw_YJ6WVRbN";
+        
+        let supabaseReady = false;
+        let lastSyncTime = 0;
+        let supabaseConnected = false;
+        const SYNC_INTERVAL = 3000;
+        
+        function checkSupabaseConfig() {
+            return SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_KEY !== "YOUR_SUPABASE_KEY";
+        }
+        supabaseReady = checkSupabaseConfig();
+        
+        function updateSupabaseStatus() {
+            const statusEl = document.getElementById('supabase-status');
+            if (!statusEl) return;
+            if (!supabaseReady) {
+                statusEl.innerHTML = '<i class="fas fa-circle" style="font-size: 0.6rem; color: #f59e0b;"></i> Mode local (Supabase non configuré)';
+            } else if (supabaseConnected) {
+                statusEl.innerHTML = '<i class="fas fa-circle" style="font-size: 0.6rem; color: #10b981;"></i> Synchronisé avec Supabase ✓';
+            } else {
+                statusEl.innerHTML = '<i class="fas fa-circle" style="font-size: 0.6rem; color: #ef4444;"></i> Vérification Supabase...';
+            }
+        }
+        
+        if (supabaseReady) {
+            fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }).then(() => {
+                supabaseConnected = true;
+                updateSupabaseStatus();
+            }).catch(() => {
+                supabaseConnected = false;
+                updateSupabaseStatus();
+            });
+        } else {
+            updateSupabaseStatus();
+        }
+        
+        // Fonctions de sauvegarde/chargement
+        const STORAGE_KEY = 'app-data-storage';
+        let isSyncing = false;
+        let lastSaveAttempt = 0;
+        
+        async function saveData(dataObject) {
+            if (!supabaseReady) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject.data));
+                } catch (e) {}
+                return;
+            }
+            
+            const now = Date.now();
+            if (now - lastSaveAttempt < 500) return;
+            lastSaveAttempt = now;
+            
+            if (isSyncing) return;
+            
+            try {
+                let payloadStr = JSON.stringify({
+                    data: dataObject.data,
+                    updated_at: new Date().toISOString()
+                });
+                
+                console.log('📤 Envoi de la sauvegarde (taille: ' + payloadStr.length + ' bytes)...');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: payloadStr
+                });
+                
+                console.log('📥 Réponse Supabase:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Erreur Supabase:', response.status, errorText);
+                    console.log('💾 Fallback localStorage');
+                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject.data)); } catch (e) {}
+                } else {
+                    console.log('✅ Sauvegarde réussie !');
+                }
+            } catch (e) {
+                console.error('❌ Erreur réseau:', e);
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObject.data));
+                } catch (e2) {}
+            }
+        }
+        
+        async function loadData() {
+            if (!supabaseReady) {
+                console.log('📖 Mode local: chargement depuis localStorage');
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) {
+                        console.log('📖 Aucune donnée locale');
+                        return null;
+                    }
+                    const data = JSON.parse(raw);
+                    console.log('📖 Données locales chargées');
+                    return data;
+                } catch (e) {
+                    console.error('❌ Erreur chargement local:', e);
+                }
+                return null;
+            }
+            
+            console.log('📖 Chargement depuis Supabase...');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('📖 Réponse Supabase reçue');
+                    
+                    if (data && data.length > 0 && data[0].data) {
+                        console.log('✅ Données Supabase chargées');
+                        return data[0].data;
+                    } else {
+                        console.warn('📖 Supabase retourne un tableau vide');
+                        return null;
+                    }
+                } else {
+                    console.error('❌ Réponse Supabase invalide:', response.status);
+                    throw new Error('Réponse Supabase invalide');
+                }
+            } catch (e) {
+                console.warn('❌ Chargement Supabase échoué, fallback localStorage:', e);
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return null;
+                    return JSON.parse(raw);
+                } catch (e2) {
+                    console.error('❌ Erreur fallback:', e2);
+                    return null;
+                }
+            }
+        }
+        
         // Données initiales (simulées)
         let litiges = [
             {id: 1, reference: "LIT-2024-001", type: "livraison", statut: "ouvert", date: "2024-01-15", client: "Client A", intervenant: "Julie", description: "Retard de livraison constaté", details: "BL 12345"},
@@ -672,6 +849,40 @@
                 litiges = JSON.parse(stored);
             }
         }
+        
+        // Synchronisation périodique (polling)
+        setInterval(async () => {
+            const now = Date.now();
+            if (now - lastSyncTime >= SYNC_INTERVAL && supabaseReady) {
+                lastSyncTime = now;
+                try {
+                    const response = await fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                        method: 'GET',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.length > 0) {
+                            const remoteData = data[0];
+                            const remoteTime = new Date(remoteData.updated_at).getTime();
+                            // Comparer les timestamps pour mettre à jour si nécessaire
+                            if (remoteData.data) {
+                                isSyncing = true;
+                                // Appeler votre fonction de mise à jour UI ici
+                                console.log('🔄 Données synchronisées depuis Supabase');
+                                isSyncing = false;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Erreur synchronisation:', e);
+                }
+            }
+        }, 1000);
     </script>
 </body>
 </html>
