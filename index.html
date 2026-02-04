@@ -531,7 +531,7 @@
         }
         
         if (supabaseReady) {
-            fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+            fetch(`${SUPABASE_URL}/rest/v1/litige?id=eq.1`, {
                 method: 'GET',
                 headers: {
                     'apikey': SUPABASE_KEY,
@@ -576,7 +576,7 @@
                 
                 console.log('📤 Envoi de la sauvegarde (taille: ' + payloadStr.length + ' bytes)...');
                 
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/litige?id=eq.1`, {
                     method: 'PATCH',
                     headers: {
                         'apikey': SUPABASE_KEY,
@@ -624,7 +624,7 @@
             
             console.log('📖 Chargement depuis Supabase...');
             try {
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/litige?id=eq.1`, {
                     method: 'GET',
                     headers: {
                         'apikey': SUPABASE_KEY,
@@ -856,7 +856,7 @@
             if (now - lastSyncTime >= SYNC_INTERVAL && supabaseReady) {
                 lastSyncTime = now;
                 try {
-                    const response = await fetch(`${SUPABASE_URL}/rest/v1/Litige?id=eq.1`, {
+                    const response = await fetch(`${SUPABASE_URL}/rest/v1/litige?id=eq.1`, {
                         method: 'GET',
                         headers: {
                             'apikey': SUPABASE_KEY,
