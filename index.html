@@ -410,8 +410,8 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="client">Client / Transporteur</label>
-                        <input type="text" id="client" placeholder="Nom du client ou transporteur">
+                        <label for="client">Client</label>
+                        <input type="text" id="client" placeholder="Nom du client">
                     </div>
                     
                     <div class="form-group">
@@ -481,7 +481,7 @@
                             <th>Référence</th>
                             <th>Type</th>
                             <th>Statut</th>
-                            <th>Client / Transporteur</th>
+                            <th>Client</th>
                             <th>Intervenant</th>
                             <th>Description</th>
                             <th>Actions</th>
@@ -784,6 +784,14 @@
             }
         }
 
+        function showDetails(id) {
+            const litige = litiges.find(l => l.id === id);
+            if (litige) {
+                const details = litige.details || "Aucun détail supplémentaire";
+                alert("Détails supplémentaires pour " + litige.reference + " :\n\n" + details);
+            }
+        }
+
         function updateStatut(id, newStatut) {
             const litige = litiges.find(l => l.id === id);
             if (litige && ['ouvert', 'encours', 'resolu', 'facture'].indexOf(newStatut) !== -1) {
@@ -854,7 +862,10 @@
                     '<td>' + litige.client + '</td>' +
                     '<td>' + (litige.intervenant || '-') + '</td>' +
                     '<td title="' + (litige.description || '').replace(/"/g, '&quot;') + '">' + descShort + '</td>' +
-                    '<td><button onclick="deleteLitige(' + litige.id + ')" class="btn-secondary" style="padding: 8px 12px; font-size: 0.9rem;">Supprimer</button></td>';
+                    '<td>' +
+                        '<button onclick="showDetails(' + litige.id + ')" class="btn-secondary" style="padding: 6px 10px; font-size: 0.8rem; margin-right: 5px;">Détails</button>' +
+                        '<button onclick="deleteLitige(' + litige.id + ')" class="btn-secondary" style="padding: 6px 10px; font-size: 0.8rem;">Supprimer</button>' +
+                    '</td>';
                 
                 tbody.appendChild(row);
             });
