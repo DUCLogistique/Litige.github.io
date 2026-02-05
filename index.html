@@ -415,8 +415,8 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="details">Détails supplémentaires (optionnel)</label>
-                        <input type="text" id="details" placeholder="N° commande, BL, etc.">
+                        <label for="details">Nombre de palettes / colis</label>
+                        <input type="text" id="details" placeholder="Ex: 5 palettes, 12 colis">
                     </div>
                     
                     <div class="form-group">
@@ -787,8 +787,8 @@
         function showDetails(id) {
             const litige = litiges.find(l => l.id === id);
             if (litige) {
-                const details = litige.details || "Aucun détail supplémentaire";
-                alert("Détails supplémentaires pour " + litige.reference + " :\n\n" + details);
+                const description = litige.description || "Aucune description";
+                alert("Description du litige " + litige.reference + " :\n\n" + description);
             }
         }
 
@@ -852,7 +852,7 @@
                     '<option value="resolu"' + (litige.statut === 'resolu' ? ' selected' : '') + '>Résolu</option>' +
                     '<option value="facture"' + (litige.statut === 'facture' ? ' selected' : '') + '>Facturé</option>' +
                     '</select>';
-                const descShort = (litige.description || '').substring(0, 50) + ((litige.description || '').length > 50 ? '...' : '');
+                const detailsShort = (litige.details || '').substring(0, 50) + ((litige.details || '').length > 50 ? '...' : '');
                 
                 row.innerHTML = 
                     '<td>' + formattedDate + '</td>' +
@@ -861,7 +861,7 @@
                     '<td>' + statutSelect + '</td>' +
                     '<td>' + litige.client + '</td>' +
                     '<td>' + (litige.intervenant || '-') + '</td>' +
-                    '<td title="' + (litige.description || '').replace(/"/g, '&quot;') + '">' + descShort + '</td>' +
+                    '<td title="' + (litige.details || '').replace(/"/g, '&quot;') + '">' + detailsShort + '</td>' +
                     '<td>' +
                         '<button onclick="showDetails(' + litige.id + ')" class="btn-secondary" style="padding: 6px 10px; font-size: 0.8rem; margin-right: 5px;">Détails</button>' +
                         '<button onclick="deleteLitige(' + litige.id + ')" class="btn-secondary" style="padding: 6px 10px; font-size: 0.8rem;">Supprimer</button>' +
